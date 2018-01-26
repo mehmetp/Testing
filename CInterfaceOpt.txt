@@ -1,0 +1,111 @@
+
+CInterface tasks taking long execution durations and using p_vb_custom_pai.imp_accrual_rq_sq procedure listed below, 
+
+IMP_EY_ACCRUAL_RQ_2 4:45
+IMP_SQ_ACCRUAL_RQ 8:50
+IMP_HA_ACCRUAL_RQ 8:55
+IMP_EY_ACCRUAL_RQ 9:30
+IMP_VX_ACCRUAL_RQ 9:40
+IMP_MI_ACCRUAL_RQ 11:45
+IMP_NZ_ACCRUAL_RQ 11:45
+IMP_NZDJ_ACCRUAL_RQ 11:55
+
+Rest of the interface tasks using p_vb_custom_pai.imp_accrual_rq_sq procedure listed below will also be impacted. 
+
+IMP_SQDJ_ACCRUAL_RQ
+IMP_VS_ACCRUAL_RQ
+IMP_OA_VA_ACCRUAL_RQ
+IMP_SA_ACCRUAL_RQ
+IMP_HNA_ACCRUAL_RQ
+
+
+Alter table pai_accrual_rq add a combined index for pai_file_isn and pai_file_name columns.
+(drop index IDX#PAI_ACCRUAL_RQ#PFI;
+ create index IDX#PAI_ACCRUAL_RQ#PFI on PAI_ACCRUAL_RQ (PAI_FILE_ISN, PAI_FILE_NAME);
+)
+
+Update p_pai_accrual.update_accrual_rq_hdr to include  pai_file_isn and pai_file_name as an input with default null. 
+Update records not just for status but also using file isn and name as well to prevent unwanted updates during parallel job executions. 
+Update p_vb_custom_pai.imp_accrual_rq_sq to set pai_file_isn and pai_file_name inputs for p_pai_accrual.update_accrual_rq_hdr.
+Since table has been altered with the indexes, p_pai_accrual.update_pai_source's performance will be improved.
+
+
+To improve performance, at p_pai_accrual.exp_acrual_hb add pai_file_name into the where condition during update. 
+Rest of the functions / procedures all use file name and isn as input. 
+
+   update pai_accrual_rq_hdr hdr
+       set hdr.pai_status = 'OK'
+     where hdr.pai_file_isn = v_file_isn;
+
+	 
+Following interfaces uses p_pai_accrual.exp_acrual_hb
+
+EXP_MI_ACCRUAL_HB_TO_MI
+EXP_SA_ACCRUAL_HB_TO_SA
+EXP_EY_ACCRUAL_HB_TO_EY
+EXP_VS_ACCRUAL_HB
+EXP_HA_ACCRUAL_HB_TO_HA
+EXP_SQDJ_ACCRUAL_HB_TO_DJ
+EXP_VX_ACCRUAL_HB
+EXP_OA_VA_ACCRUAL_HB
+EXP_NZ_ACCRUAL_HB_TO_NZ
+EXP_NZDJ_ACCRUAL_HB_TO_DJ
+EXP_DJ_SQ_ACCRUAL_HB_TO_SQ
+EXP_VA_SQ_ACCRUAL_HB_TO_SQ
+
+EXP_HNA_ACCRUAL_HB uses p_pai_accrual.exp_accrual_grp_hb
+
+Even though they are not listed in the tasks taking more than 30 minutes duration, their performance will also be improved.
+
+
+Following billing interface tasks, which can also be executed within a job. 
+Since these interfaces includes recalculation of activities according to the partner we cannot improve performance further. 
+
+EXP_PAI_BILLING_RQ_EY
+EXP_PAI_BILLING_RQ_MI
+EXP_PAI_BILLING_RQ_NZ
+EXP_PAI_BILLING_RQ_SQ
+
+
+Following Retro interface tasks take more than 30 minutes. 
+
+IMP_EY_RETRO_RESPONSE2
+IMP_NZ_RETRO_RESPONSE
+
+We may add these tasks to Job but since backend code does not provide parallel execution, 
+either we have to change backend development to be aligned with parallel execution. 
+Or we may add all the retro tasks using the same procedure in the same scheduled job to be executed in order which are;
+
+IMP_EY_RETRO_RESPONSE2
+IMP_NZ_RETRO_RESPONSE
+IMP_NZDJ_RETRO_RESPONSE
+IMP_SQ_RETRO_RESPONSE
+IMP_SQDJ_RETRO_RESPONSE
+IMP_SA_RETRO_RESPONSE
+IMP_MI_RETRO_RESPONSE
+IMP_EY_RETRO_RESPONSE
+IMP_HNA_RETRO_RESPONSE
+
+
+Following indexes have been created at CERT env for performance concerns, maybe we can add these indexes to PROD env as well. 
+It may improve performans both for billing and retro operations. 
+IDX#RETRO_CLAIMS#BAS
+IDX#PAI_ACCRUAL_RQ#IRN
+
+We may add these tasks to job(parallel execution as in BP) but since backend code does not provide parallel execution, 
+either we have to change backend development to be aligned with parallel execution or 
+we may add all the retro tasks using the same procedure in the same scheduled job to be executed in order which are;
+
+There have been some changes in CERT environment as you know in order to increase performance. 
+(Item number #3144). Some indexes have been created at CERT environment to increase performance of the 
+Interfaces maybe these created indexes can be applied to PROD environment as well so it may improve performance for both billing and retro operations.
+
+
+
+
+
+
+
+
+
+
